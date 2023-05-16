@@ -1,0 +1,204 @@
+#######
+# Beispiellösung Untergang der Titanic
+#####
+rm(list = ls())
+setwd('/Users/oliver/Documents/hhn_scw/Analytics/08_LogistischeRegression/03_Titanic')
+X = data.frame(read.csv("titanic.csv", header = TRUE, sep = ";"))
+
+head(X)
+str(X)
+
+# Variablen PassengerId, Name, Cabin und Ticket aus dem Datensatz entfernen
+
+X = subset(X,select = c(2,3,5,6,7,8,10,12))
+
+head(X)
+str(X)
+nrow(X)
+X$Survived = factor(X$Survived,
+                    levels = c(0, 1),
+                    labels = c("died", "survived"))
+
+table(X$Survived)
+
+# ****************************
+# Aufgabe 2
+# ****************************
+
+# Kontingenztabellen
+table(X$Pclass, X$Survived)
+prop.table(table(X$Pclass, X$Survived), margin = 1)
+# Chi-Quadrat Unabhaengigkeitstest
+chisq.test(table(X$Pclass, X$Survived))
+
+mosaicplot(table(X$Pclass, X$Survived), ylab = "Survived", xlab = "PClass",
+           main = "Ueberleben auf der Titanic",
+           col = c("red", "green"))
+
+# ****************************
+# Aufgabe 3
+# ****************************
+library(caret)
+
+# Aufteilung in Trainings- und Testdaten
+zeilen = nrow(X)
+train_id = createDataPartition(X$Survived, p =0.7, list = FALSE)
+train <-X[train_id,]
+test <- X[-train_id,]
+nrow(train)
+nrow(test)
+nrow(train)/(nrow(train)+nrow(test))
+
+
+
+# ****************************
+# Aufgabe 4
+# ****************************
+
+mlog = glm(Survived ~ ., data = train, family = "binomial")
+summary(mlog)
+
+mlog2 = glm(Survived ~ Pclass + Sex + Age + SibSp, data = train, family = "binomial")
+summary(mlog2)
+
+# Vergleich der Modelle mit Hilfe des Akaike Informationskriteriums 
+mlog$aic
+mlog2$aic
+
+library(lmtest)
+?lrtest
+lrtest(mlog2)
+lrtest(mlog, mlog2)
+
+# ****************************
+# Aufgabe 5
+# ****************************
+
+# Odds
+mlog2$coefficients
+
+odds = exp(sum(mlog2$coefficients * c(1, 1, 1, 55, 1)))
+odds
+
+# Wahrscheinlichkeit
+predict(mlog2, 
+        newdata = data.frame(Pclass = 1, Sex = "male", Age = 55 , SibSp = 1), 
+        type = "response")
+
+
+# alternativ: P/1-P = odds ==> P = odds*(1-P) 
+odds / (1+odds) 
+
+# Odds-Ratios der Variablen
+# Beispielinterpreation:
+# Verglichen mit Frauen ist die Chance von Maennern zu ueberleben um über 93% kleiner als bei Frauen (wenn alle anderen Werte konstant bleiben).
+# Mit jedem Geschwister/Ehepartner an Bord sinkt due die Chance zu Ueberleben um ca. 21% 
+exp(mlog2$coefficients)
+# .. noch schicker
+# odds ratios und 95% CI
+exp(cbind(OR = coef(mlog2), confint(mlog2)))
+
+# ****************************
+# Aufgabe 6
+# ****************************
+
+data_maenner = data.frame(
+  Pclass = 1,
+  Sex = "male",
+  Age = 1:90,
+  SibSp = 0
+)
+
+maenner = predict(mlog2, newdata = data_maenner, type = "response")
+
+data_frauen = data.frame(
+  Pclass = 1,
+  Sex = "female",
+  Age = 1:90,
+  SibSp = 0
+)
+
+frauen = predict(mlog2, newdata = data_frauen, type = "response")
+
+plot(NA, xlim = c(0,90), ylim = c(0,1), 
+     xlab = "Alter", ylab = "Ueberlebenswahrscheinlichkeit", 
+     main = "Ueberleben auf der Titanic")
+
+lines(1:90, maenner, lwd = 2, col = "blue")
+lines(1:90, frauen, lwd = 2, col = "deeppink")
+
+legend(0, .4, legend = c("Maenner", "Frauen"), lwd = 2, col = c("blue", "deeppink"))
+
+# ****************************
+# Aufgabe 7
+# ****************************
+train = na.omit(train)
+
+train$pred_train = predict(mlog2, newdata = train, type = "response")
+train$pred_train[train$pred_train > 0.5] = 1
+train$pred_train[train$pred_train <= 0.5] = 0
+train$pred_train = factor(train$pred_train,  levels = c(0, 1),
+                          labels = c("died", "survived"))
+logit_train_accuracy = mean(train$pred_train == train$Survived)
+logit_train_accuracy
+
+
+
+
+test = na.omit(test)
+
+# Accuracy ==> zwei Varianten:
+# Variante 1:
+test$pred_test = predict(mlog2, newdata = test, type = "response")
+
+test$pred_test[test$pred_test > 0.5] = 1
+test$pred_test[test$pred_test <= 0.5] = 0
+test$pred_test = factor(test$pred_test,  levels = c(0, 1),
+                        labels = c("died", "survived"))
+
+logit_accuracy = mean(test$pred_test == test$Survived)
+logit_accuracy
+
+
+# Variante 2:
+#confusion matrix (Wahrheitsmatrix)
+test$pred_test = predict(mlog2, newdata = test, type = "response")
+test_ConfMatrix = table(test$Survived, test$pred_test > 0.5)
+test_ConfMatrix
+test_ConfMatrix[1,1]
+test_accuracy = (test_ConfMatrix[1,1]+test_ConfMatrix[2,2])/sum(test_ConfMatrix)
+test_accuracy
+
+
+#ROCR Curve
+# install.packages("ROCR")
+library(ROCR)
+ROCRpred = prediction(test$pred_test, test$Survived)
+ROCRperf = performance(ROCRpred, measure = "tpr", x.measure = "fpr")
+plot(ROCRperf, colorize = TRUE, print.cutoffs.at = seq(0, 1, 0.10), lwd  = 3  )
+abline(a=0, b= 1)
+
+# .. .ROC Curve im vergleich zu Trainingsdaten
+train$pred_train = predict(mlog2, newdata = train, type = "response")
+ROCRpred_train = prediction(train$pred_train, train$Survived)
+ROCRperf_train = performance(ROCRpred_train, measure = "tpr", x.measure = "fpr")
+plot(ROCRperf_train, colorize = TRUE, print.cutoffs.at = seq(0, 1, 0.10), lwd  = 3  )
+
+# ... beide ROC in eine Grafik
+plot(ROCRperf, colorize = FALSE,  col = 'red', lwd  = 3  )
+plot(ROCRperf_train, colorize = FALSE,  col = 'blue', lwd  = 3 , lty = 1, add = TRUE)
+abline(a=0, b= 1)
+legend(x= 0.0,y=1.0, c("Testdaten","Trainingsdaten"), cex=.8,col=c("red", "blue"), lty=c(1,1), lwd = c(3,3))
+
+# Trefferquote bei alternativen Cutoffs
+plot(performance(ROCRpred, measure = "acc"), col = 'red', ylim = c(0.4,0.9))
+plot(performance(ROCRpred_train, measure = "acc"), col = 'blue', add = TRUE)
+legend(x= 0.0,y=0.9, c("Testdaten","Trainingsdaten"), cex=.8,col=c("red", "blue"), lty=c(1,1), lwd = c(3,3))
+
+acc = performance(ROCRpred, measure = "acc")
+
+
+which.max(acc@y.values[[1]])
+Beste_Accuracy = acc@y.values[[1]][which.max(acc@y.values[[1]])]
+Bester_CutOff = acc@x.values[[1]][which.max(acc@y.values[[1]])]
+abline(v=Bester_CutOff, h = Beste_Accuracy)
