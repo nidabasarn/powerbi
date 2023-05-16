@@ -2,7 +2,7 @@
 # Beispiellösung Untergang der Titanic
 #####
 rm(list = ls())
-setwd('/Users/oliver/Documents/hhn_scw/Analytics/08_LogistischeRegression/03_Titanic')
+setwd('titanic.csv')
 X = data.frame(read.csv("titanic.csv", header = TRUE, sep = ";"))
 
 head(X)
