@@ -21,7 +21,7 @@ X$Survived = factor(X$Survived,
 table(X$Survived)
 
 # ****************************
-# Aufgabe 2
+# Zusammenhang zwischen Pclass und Survived
 # ****************************
 
 # Kontingenztabellen
@@ -35,7 +35,7 @@ mosaicplot(table(X$Pclass, X$Survived), ylab = "Survived", xlab = "PClass",
            col = c("red", "green"))
 
 # ****************************
-# Aufgabe 3
+# Aufteilung der Daten in Trainings- und Testdaten
 # ****************************
 library(caret)
 
@@ -51,7 +51,7 @@ nrow(train)/(nrow(train)+nrow(test))
 
 
 # ****************************
-# Aufgabe 4
+# Aufstellung eines logistischen Regressionsmodells
 # ****************************
 
 mlog = glm(Survived ~ ., data = train, family = "binomial")
@@ -70,7 +70,7 @@ lrtest(mlog2)
 lrtest(mlog, mlog2)
 
 # ****************************
-# Aufgabe 5
+# Berechnungen von Odds, Überlebenswahrscheinlichkeit und Odds-Ratios
 # ****************************
 
 # Odds
@@ -98,7 +98,7 @@ exp(mlog2$coefficients)
 exp(cbind(OR = coef(mlog2), confint(mlog2)))
 
 # ****************************
-# Aufgabe 6
+# Regressionskurve plotten
 # ****************************
 
 data_maenner = data.frame(
@@ -129,7 +129,7 @@ lines(1:90, frauen, lwd = 2, col = "deeppink")
 legend(0, .4, legend = c("Maenner", "Frauen"), lwd = 2, col = c("blue", "deeppink"))
 
 # ****************************
-# Aufgabe 7
+# Klassifizierungsgüte des Modells
 # ****************************
 train = na.omit(train)
 
